@@ -94,8 +94,8 @@ class PhaseOperator:
 
             li, lj, lk, hl, lc, _ = leg(-1)
             ri, rj, rk, hr, rc, _ = leg(+1)
-            hl = np.maximum(hl, 1e-8 * dx)
-            hr = np.maximum(hr, 1e-8 * dx)
+            hl = np.maximum(hl, 1e-3 * dx)
+            hr = np.maximum(hr, 1e-3 * dx)
             cl = 2.0 / (hl * (hl + hr))
             cr = 2.0 / (hr * (hl + hr))
             c0 = -2.0 / (hl * hr)
