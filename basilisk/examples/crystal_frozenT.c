@@ -5,7 +5,7 @@ A small seed grows in an undercooled binary liquid. The temperature is prescribe
 a moving gradient T = T_iso + G (y - V_p t) when compiled with `-DDIRECTIONAL`. The surface energy has
 four-fold anisotropy (stiffness gamma + gamma''), plus optional kinetic undercooling.
 
-    usage: ./crystal_frozenT [MAXLEVEL] [t_end] [eps4]
+    usage: ./crystal_frozenT [MAXLEVEL] [t_end] [eps4] [reinit iterations]
 
 Output: `interface-NNNN.dat` (x y V T c_l c_s per interface cell) every `dt_out`. */
 
@@ -38,6 +38,7 @@ int main (int argc, char ** argv)
   if (argc > 1) MAXLEVEL = atoi (argv[1]); else MAXLEVEL = 7;
   if (argc > 2) tend = atof (argv[2]);
   double eps4 = argc > 3 ? atof (argv[3]) : 0.02;
+  if (argc > 4) itredist = atoi (argv[4]);       // reinitialisation iterations per step (default 10)
   MINLEVEL = 4;
   size (1.);
   init_grid (1 << MAXLEVEL);

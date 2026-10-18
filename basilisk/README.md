@@ -69,7 +69,7 @@ round-off. **Smoke runs done** (no crashes, no Newton failures): binary and tern
 Stefan solution, trapping, and everything in 3D beyond "it runs".
 
 Known limitations / approximations:
-- Solute conservation: in the planar runs the total drifts by less than +0.1% (binary +0.09%, ternary +0.06%/+0.04%). It is not exact by construction (emerged cells are filled by extrapolation, not a conservative update), and the curved-front (crystal) runs lose noticeably more (about 2% by t = 0.02 at 128x128 levels): not yet understood.
+- Solute conservation: in the planar runs the total drifts by less than +0.1% (binary +0.09%, ternary +0.06%/+0.04%). It is not exact by construction (emerged cells are filled by extrapolation, not a conservative update), and the curved-front (crystal) runs lose 7-8% of the solute by t = 0.08 (level 7). Diagnosis so far: with the interface frozen the liquid volume still creeps by ~2e-5 per step (the level-set reinitialisation/fraction update shrinks a small seed), and the solid volume gained per step is 83-97% of V*A*dt. Adaptation, the number of reinitialisation iterations, and the diffusion solver are not the cause (uniform grid and 0/2/10 reinit iterations give the same drift). Planar fronts, which are axis-aligned, are unaffected. The level-set volume error on small/curved interfaces needs a fix (e.g. volume-correcting reinitialisation, or deriving the solute exchange from the actual change of `cs`).
 - First-order in time; the front is advanced with a lagged speed and a small time step is needed for the explicit curvature
   (`mc_dt_max`), as in the sandbox solver.
 - Constant interdiffusion matrices per phase; no composition-dependent D.

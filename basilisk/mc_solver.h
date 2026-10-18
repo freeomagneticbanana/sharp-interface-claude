@@ -414,7 +414,9 @@ event mc_advance (i++) {
   restriction ({csm1});
 
   /* level set: advect, reinitialise, fractions, curvature */
+#ifndef MC_FREEZE_GEOMETRY                       // debug switch: keep the interface fixed
   RK3_WENO5 (dist, vpcf, dt, NB_width);
+#endif
   boundary ({dist});
   restriction ({dist});
   LS_reinit (dist = dist, dt = 0.2*L0/(1 << grid->maxdepth), it_max = itredist);
