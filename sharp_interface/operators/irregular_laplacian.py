@@ -79,12 +79,12 @@ class PhaseOperator:
                 # crossing on the edge between (I,J) and (ni,nj)
                 if ax == 0:
                     ei = np.where(sign > 0, I, I - 1)
-                    ec = cs.cid0[np.clip(ei, 0, nx - 2), J]
+                    ec = cs.cid0[np.clip(ei, 0, nx - 2), J] if nx > 1 else -np.ones_like(I)
                     ec = np.where((ei < 0) | (ei > nx - 2), -1, ec)
                     node_is_first = sign > 0
                 else:
                     ej = np.where(sign > 0, J, J - 1)
-                    ec = cs.cid1[I, np.clip(ej, 0, ny - 2)]
+                    ec = cs.cid1[I, np.clip(ej, 0, ny - 2)] if ny > 1 else -np.ones_like(I)
                     ec = np.where((ej < 0) | (ej > ny - 2), -1, ec)
                     node_is_first = sign > 0
                 th = np.where(ec >= 0, cs.theta[np.clip(ec, 0, None)] if cs.n else 0.0, 0.5)
