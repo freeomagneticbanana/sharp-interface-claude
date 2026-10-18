@@ -62,14 +62,14 @@ Developed against the Basilisk release of 2025-02-26 (`NEWS`: "macros"). qcc nee
 
 **Unit-level checks done:** thermodynamics, tie lines, anisotropy and mode decomposition match the Python reference to
 round-off. **Smoke runs done** (no crashes, no Newton failures): binary and ternary planar fronts (front position within
-~0.5% of the exact similarity solution at 256^2), thermosolutal planar front, anisotropic 2D crystal, 3D octree crystal.
+~0.5% of the exact similarity solution at 256^2; composition profiles in both phases match the exact solution, liquid error < 1e-3), thermosolutal planar front, anisotropic 2D crystal, 3D octree crystal.
 
 **Not validated yet:** convergence orders, solid diffusion (`D_s > 0`) against the exact solution, curved fronts
 (Frank/radial, Mullins-Sekerka growth rate), dendrite tip velocity, the evolving-temperature path against an analytic
 Stefan solution, trapping, and everything in 3D beyond "it runs".
 
 Known limitations / approximations:
-- Solute is **not exactly conserved**: about 2% drift over the planar runs (emerged-cell fill is an extrapolation, not a conservative update).
+- Solute conservation: in the planar runs the total drifts by less than +0.1% (binary +0.09%, ternary +0.06%/+0.04%). It is not exact by construction (emerged cells are filled by extrapolation, not a conservative update), and the curved-front (crystal) runs lose noticeably more (about 2% by t = 0.02 at 128x128 levels): not yet understood.
 - First-order in time; the front is advanced with a lagged speed and a small time step is needed for the explicit curvature
   (`mc_dt_max`), as in the sandbox solver.
 - Constant interdiffusion matrices per phase; no composition-dependent D.
@@ -77,5 +77,6 @@ Known limitations / approximations:
 - Trapping uses the continuous-growth interpolation per component with the *equilibrium* driving force (no kinetic liquidus shift).
 - **Adaptation must include every transported field**: with an under-resolved thermal layer, adapting on the solute alone let the
   evolving-temperature case run away; `mc_adapt` therefore blends and adapts all fields (set `mc_adapt_tol_field[]`).
+- Cells swept by the front are filled with `fill_value` (weighted plane fit over neighbours that held the phase at the previous step). `embed_extrapolate_ls` is deliberately not used: with `emerged = false` its quadratic fit is singular for a front sweeping a whole row of cells and silently returns 0; with `emerged = true` it reads stale values of cells emerging in the same step.
 - The user's `init` event must run before the solver events; `mc_solver.h` declares an empty `init` first to guarantee it.
 - Third-party code (Limare, Ghigo sandboxes) is downloaded, not redistributed; check their licences on basilisk.fr.

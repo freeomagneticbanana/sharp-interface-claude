@@ -101,4 +101,20 @@ event report (t += 0.005; t <= TEND - T0)
   fflush (stdout);
 }
 
+/* centreline composition profile at the final time, for comparison with the exact solution */
+event profile (t = TEND - T0)
+{
+  FILE * fp = fopen ("profile_binary.dat", "w");
+  scalar wl = WL[0].s, ws = WS[0].s;
+  double tau = t + T0, X = 2.*lam_ex*sqrt (MC.Dl[0][0]*tau);
+  for (int k = 0; k < 400; k++) {
+    double xx = 0.01 + (L0 - 0.02)*k/399., y0 = L0/2.;
+    double d = interpolate (dist, xx, y0);
+    double c = d > 0. ? interpolate (wl, xx, y0) : interpolate (ws, xx, y0);
+    double ce = xx > X ? CINF + (c_star - CINF)*erfc (xx/(2.*sqrt (MC.Dl[0][0]*tau)))/erfc (lam_ex) : c_sG;
+    fprintf (fp, "%g %g %g\n", xx, c, ce);
+  }
+  fclose (fp);
+}
+
 event stop (t = TEND - T0) { return 1; }

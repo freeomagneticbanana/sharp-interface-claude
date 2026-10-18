@@ -14,8 +14,8 @@ Output: `interface-NNNN.dat` (x y V T c_l c_s per interface cell) every `dt_out`
 
 #define TM 1000.
 #define TISO 990.
-#define CINF 0.15
-#define R0 0.04
+#define CINF 0.12
+#define R0 0.05
 #ifdef DIRECTIONAL
  #define GRAD 20.          // temperature gradient dT/dy
  #define VPULL 0.5         // pulling speed
@@ -85,5 +85,22 @@ event output (t += dt_out; t <= tend)
   fprintf (stderr, "t=%g step=%d interface-file=%s solute=%.6e newton-failures=%d\n", t, i, name, inv[0], mc_nfail);
 }
 
-event stop (t = 1e30) { }
+/* liquid composition field (component 0) on a regular grid at the end, for plotting */
+event fields (t = tend)
+{
+  FILE * fp = fopen ("field.dat", "w");
+  scalar wl = WL[0].s, ws = WS[0].s;
+  int n = 256;
+  for (int a = 0; a < n; a++) {
+    for (int b = 0; b < n; b++) {
+      double xx = (a + 0.5)*L0/n, yy = (b + 0.5)*L0/n;
+      double d = interpolate (dist, xx, yy);
+      double c = d > 0. ? interpolate (wl, xx, yy) : interpolate (ws, xx, yy);
+      fprintf (fp, "%g ", c);
+    }
+    fprintf (fp, "\n");
+  }
+  fclose (fp);
+}
+
 event end (t = tend) { return 1; }

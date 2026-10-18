@@ -120,4 +120,24 @@ event report (t += 0.005; t <= TEND - T0)
   fflush (stdout);
 }
 
+event profile (t = TEND - T0)
+{
+  FILE * fp = fopen ("profile_ternary.dat", "w");
+  scalar w0 = WL[0].s, w1 = WL[1].s, s0 = WS[0].s, s1 = WS[1].s;
+  double tau = t + T0, X = 2.*lam_ex*sqrt (Dd[0]*tau);
+  for (int k = 0; k < 400; k++) {
+    double xx = 0.01 + (L0 - 0.02)*k/399., y0 = L0/2.;
+    int liq = interpolate (dist, xx, y0) > 0.;
+    double c0 = liq ? interpolate (w0, xx, y0) : interpolate (s0, xx, y0);
+    double c1 = liq ? interpolate (w1, xx, y0) : interpolate (s1, xx, y0);
+    double e[NC];
+    for (int i = 0; i < NC; i++) {
+      double li = lam_ex*sqrt (Dd[0]/Dd[i]);
+      e[i] = xx > X ? cinf[i] + (c_star[i] - cinf[i])*erfc (xx/(2.*sqrt (Dd[i]*tau)))/erfc (li) : c_sG[i];
+    }
+    fprintf (fp, "%g %g %g %g %g\n", xx, c0, e[0], c1, e[1]);
+  }
+  fclose (fp);
+}
+
 event stop (t = TEND - T0) { return 1; }

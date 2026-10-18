@@ -336,15 +336,56 @@ event mc_stability (i++) {
 /**
 ## Advection of the interface, field fill, and implicit transport on the new geometry */
 
-static void fill_emerged (scalar * fields, bool solid)
+/**
+Cells that did not contain the phase at the previous step ("emerged") get a value extrapolated from the
+neighbouring cells that *did* (`csm1 > 0`) and still do (`cs > 0`): a distance-weighted least-squares plane
+f = a0 + g.r over the 5x5(x5) stencil, evaluated at the cell centre. A light ridge penalty on the slope g keeps the
+fit well posed when the valid neighbours are one-sided and narrow (a front sweeping a whole row of cells leaves
+only two usable columns, for which the quadratic fit of `embed_extrapolate_ls` is singular and silently returns 0).
+`cs` must be the fraction of the phase being filled and `csm1` its previous value. */
+
+static double fill_value (Point point, scalar f)
+{
+  const int nd = dimension + 1;
+  double A[16] = {0.}, rhs[4] = {0.}, wsum = 0.;
+  int nvalid = 0;
+#if dimension == 2
+  for (int i = -2; i <= 2; i++)
+    for (int j = -2; j <= 2; j++) {
+      if ((i || j) && cs[i,j] > 0. && csm1[i,j] > 0.) {
+        double r[3] = {1., i, j}, w = 1./(i*i + j*j), v = f[i,j];
+#else
+  for (int i = -2; i <= 2; i++)
+    for (int j = -2; j <= 2; j++)
+      for (int k = -2; k <= 2; k++) {
+      if ((i || j || k) && cs[i,j,k] > 0. && csm1[i,j,k] > 0.) {
+        double r[4] = {1., i, j, k}, w = 1./(i*i + j*j + k*k), v = f[i,j,k];
+#endif
+        for (int a_ = 0; a_ < nd; a_++) {
+          rhs[a_] += w*r[a_]*v;
+          for (int b_ = 0; b_ < nd; b_++) A[a_*nd + b_] += w*r[a_]*r[b_];
+        }
+        wsum += w;
+        nvalid++;
+      }
+    }
+  if (!nvalid)
+    return f[];                                   // nothing to extrapolate from: keep the current value
+  for (int a_ = 1; a_ < nd; a_++)
+    A[a_*nd + a_] += 0.05*wsum;                   // ridge on the slope components only
+  double sol[4];
+  if (mc_gauss (nd, A, rhs, sol))
+    return f[];
+  return sol[0];
+}
+
+static void fill_emerged (scalar * fields)
 {
   foreach() {
-    double now = solid ? 1. - cs[] : cs[], before = solid ? 1. - csm1[] : csm1[];
-    if (now > 0. && before <= 0.) {
-      if (now >= 1.) continue;                       // a full cell cannot be an emerged cut cell
-      coord o = {0., 0., 0.};
+    if (cs[] > 0. && csm1[] <= 0.) {
+      /* compute every field before storing, so neighbours are never other emerged cells' fresh values */
       for (scalar f in fields)
-        f[] = embed_extrapolate_ls (point, f, cs, o, false);
+        f[] = fill_value (point, f);
     }
   }
   boundary (fields);
@@ -387,9 +428,15 @@ event mc_advance (i++) {
   restriction ({curve});
 
   /* cells uncovered by the motion: extrapolate each phase's fields into them */
-  fill_emerged (liquid_fields, false);
-  flip_phase();
-  fill_emerged (solid_fields, true);
+  fill_emerged (liquid_fields);
+  flip_phase();                       // cs is now the solid fraction ...
+  foreach()
+    csm1[] = 1. - csm1[];             // ... and csm1 the previous solid fraction
+  boundary ({csm1});
+  fill_emerged (solid_fields);
+  foreach()
+    csm1[] = 1. - csm1[];
+  boundary ({csm1});
   flip_phase();
 
   mc_check_finite ("after fill");
