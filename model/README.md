@@ -1,4 +1,7 @@
-# Multicomponent sharp-interface solidification on Basilisk
+# model/ — multicomponent sharp-interface solidification on Basilisk
+
+Our code only. Everything downloaded lives in `../shared/`; the Python reference implementation is `../sharp_interface/`.
+
 
 A sharp-interface solver for **N-component** alloy solidification built on Basilisk's embedded boundaries and the
 hybrid level-set / embedded-boundary method of Limare, Popinet, Josserand, Xue & Ghigo (JCP 2022). The interface
@@ -26,7 +29,7 @@ geometry, and every interface condition is imposed on the cut cells, not smeared
 | `mc_physics.h` | plain C, no Basilisk: free energies, tie lines, anisotropy, diffusion modes, **local interface Newton problem**. Checked against the Python reference (`tests/mc_physics_check.c`). |
 | `mc_solver.h` | Basilisk glue: fields, gradient responses, interface solve, level-set advection, field fill, implicit modal diffusion, adaptation, output. |
 | `examples/` | `planar_binary.c`, `ternary_planar.c` (exact similarity solutions built in), `crystal_frozenT.c` (anisotropic crystal, isothermal or `-DDIRECTIONAL`), `thermosolutal_planar.c` (evolving T), `crystal3d.c` (octree). |
-| `fetch_deps.sh`, `patches/` | download of the third-party sandbox files + one-line compatibility patch. |
+| `../shared/` | third-party sandbox code (Limare, Ghigo), its fetch script and compatibility patch: see `../shared/README.md`. |
 
 ## Conventions
 
@@ -51,8 +54,8 @@ The embedded gradient is affine in the Dirichlet value, so the local Newton prob
 ## Build
 
 ```
-./fetch_deps.sh                      # sandbox dependencies -> ./deps/basilisk-sandbox (needs basilisk.fr)
-make BASILISK=/path/to/basilisk/src planar_binary
+../shared/fetch_deps.sh              # third-party sandbox code -> ../shared (needs basilisk.fr)
+make BASILISK=/path/to/basilisk/src planar_binary    # run from model/
 ./examples/planar_binary
 ```
 Developed against the Basilisk release of 2025-02-26 (`NEWS`: "macros"). qcc needs `config` (copy `config.gcc`) and the
@@ -79,4 +82,4 @@ Known limitations / approximations:
   evolving-temperature case run away; `mc_adapt` therefore blends and adapts all fields (set `mc_adapt_tol_field[]`).
 - Cells swept by the front are filled with `fill_value` (weighted plane fit over neighbours that held the phase at the previous step). `embed_extrapolate_ls` is deliberately not used: with `emerged = false` its quadratic fit is singular for a front sweeping a whole row of cells and silently returns 0; with `emerged = true` it reads stale values of cells emerging in the same step.
 - The user's `init` event must run before the solver events; `mc_solver.h` declares an empty `init` first to guarantee it.
-- Third-party code (Limare, Ghigo sandboxes) is downloaded, not redistributed; check their licences on basilisk.fr.
+- Third-party code (Limare, Ghigo sandboxes) is downloaded into `../shared/`, not redistributed; check their licences on basilisk.fr.

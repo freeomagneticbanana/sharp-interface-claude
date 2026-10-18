@@ -1,8 +1,8 @@
 # Build the examples with qcc (Basilisk).
 #   make BASILISK=/path/to/basilisk/src            planar_binary
-# Third-party sandbox code is fetched with ./fetch_deps.sh (default into ./deps/basilisk-sandbox).
+# Third-party sandbox code lives in ../shared (fetched with ../shared/fetch_deps.sh); nothing there is edited by hand.
 BASILISK ?= $(HOME)/basilisk/src
-DEPS     ?= $(CURDIR)/deps/basilisk-sandbox
+DEPS     ?= $(abspath $(CURDIR)/../shared)
 export BASILISK
 export BASILISK_INCLUDE_PATH = $(DEPS)
 QCC      = $(BASILISK)/qcc

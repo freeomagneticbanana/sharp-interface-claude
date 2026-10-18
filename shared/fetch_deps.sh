@@ -3,10 +3,12 @@
 # boundary code and B. Ghigo's embed extensions), and apply the one-line compatibility patch needed for
 # the Feb-2025 Basilisk release.  They are not redistributed here; see their pages on basilisk.fr for licences.
 #
-#   usage: ./fetch_deps.sh [destination]      (default: ./deps/basilisk-sandbox)
+#   usage: ./fetch_deps.sh [destination]      (default: this directory, shared/)
+#
+# Files land at shared/alimare/... and shared/ghigo/src/...; model/ finds them through BASILISK_INCLUDE_PATH=shared.
 set -e
 HERE="$(cd "$(dirname "$0")" && pwd)"
-DEST="${1:-$HERE/deps/basilisk-sandbox}"
+DEST="${1:-$HERE}"
 FILES="
 alimare/LS_curvature.h
 alimare/LS_recons.h

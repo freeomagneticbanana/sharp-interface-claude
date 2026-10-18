@@ -1,4 +1,3 @@
-deps/
 examples/*
 !examples/*.c
 *.dat
