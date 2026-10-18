@@ -1,3 +1,5 @@
 examples/*
 !examples/*.c
 *.dat
+tests/*
+!tests/*.c
