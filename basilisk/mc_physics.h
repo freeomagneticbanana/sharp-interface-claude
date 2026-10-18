@@ -229,13 +229,19 @@ typedef struct { double V[NC][NC], Vinv[NC][NC], lam[NC]; } Modes;
 
 /** Modes of a Fickian matrix D. Supported: NC = 1, NC = 2 (real eigenvalues), or symmetric D of any size.
 Returns 0 on success, 1 on unsupported/complex/defective input. */
-static int modes_from_D (const double D[NC][NC], Modes * m)
+static int modes_from_D (double D[NC][NC], Modes * m)
 {
 #if NC == 1
   m->V[0][0] = m->Vinv[0][0] = 1.; m->lam[0] = D[0][0];
-  return D[0][0] > 0. ? 0 : 1;
+  return D[0][0] >= 0. ? 0 : 1;
 #elif NC == 2
   double a = D[0][0], b = D[0][1], c = D[1][0], d = D[1][1];
+  if (b == 0. && c == 0.) {                            // diagonal: modes are the components
+    m->V[0][0] = m->V[1][1] = m->Vinv[0][0] = m->Vinv[1][1] = 1.;
+    m->V[0][1] = m->V[1][0] = m->Vinv[0][1] = m->Vinv[1][0] = 0.;
+    m->lam[0] = a; m->lam[1] = d;
+    return (a >= 0. && d >= 0.) ? 0 : 1;
+  }
   double tr2 = 0.5*(a + d), disc = tr2*tr2 - (a*d - b*c);
   if (disc < -1e-14*tr2*tr2) return 1;                 // complex eigenvalues
   double sq = sqrt (disc > 0. ? disc : 0.);
@@ -249,7 +255,7 @@ static int modes_from_D (const double D[NC][NC], Modes * m)
     m->V[0][k] = v0/nrm; m->V[1][k] = v1/nrm;
   }
   if (mc_inverse (2, &m->V[0][0], &m->Vinv[0][0])) return 1;   // repeated eigenvalue of a defective matrix
-  return (m->lam[0] > 0. && m->lam[1] > 0.) ? 0 : 1;
+  return (m->lam[0] >= 0. && m->lam[1] >= 0.) ? 0 : 1;
 #else
   double A[NC*NC], Q[NC*NC];
   for (int i = 0; i < NC; i++)
@@ -260,7 +266,7 @@ static int modes_from_D (const double D[NC][NC], Modes * m)
   mc_jacobi (NC, A, Q, m->lam);
   for (int i = 0; i < NC; i++)
     for (int j = 0; j < NC; j++) { m->V[i][j] = Q[i*NC + j]; m->Vinv[j][i] = Q[i*NC + j]; }
-  for (int i = 0; i < NC; i++) if (m->lam[i] <= 0.) return 1;
+  for (int i = 0; i < NC; i++) if (m->lam[i] < 0.) return 1;
   return 0;
 #endif
 }
@@ -268,7 +274,7 @@ static int modes_from_D (const double D[NC][NC], Modes * m)
 /** Modes of the free-energy-driven form D = L H (L: Onsager mobility, SPD; H: Hessian of the phase free
 energy, SPD).  D is similar to the symmetric matrix R L R^T with H = R^T R (Cholesky), so the
 decomposition is valid for any NC.  Also returns D. Returns 0 on success. */
-static int modes_from_onsager (const double L[NC][NC], const double H[NC][NC], double D[NC][NC], Modes * m)
+static int modes_from_onsager (double L[NC][NC], double H[NC][NC], double D[NC][NC], Modes * m)
 {
   double R[NC][NC] = {{0}};
   for (int i = 0; i < NC; i++)
@@ -278,7 +284,7 @@ static int modes_from_onsager (const double L[NC][NC], const double H[NC][NC], d
       if (i == j) { if (s <= 0.) return 1; R[i][i] = sqrt (s); }
       else R[i][j] = s/R[j][j];
     }
-  /* H = Rc Rc^T, so with U = Rc^T: H = U^T U, D = L H ~ U L U^T (symmetric) */
+  /* H = Rc Rc^T and D = L H.  S = Rc^T L Rc is symmetric and Rc^T D = S Rc^T, so D = Rc^{-T} S Rc^T. */
   double S[NC*NC], Q[NC*NC], lam[NC];
   for (int i = 0; i < NC; i++)
     for (int j = 0; j < NC; j++) {
@@ -326,6 +332,8 @@ typedef struct {
   double alphaS, alphaL;       // thermal diffusivities  k / (rho c)   (evolving T)
   double kS, kL;               // thermal conductivities               (evolving T)
   double rhoLat;               // volumetric latent heat rho L          (evolving T)
+  int trapping;                // 1: continuous-growth solute trapping (see mc_partition), 0: local equilibrium
+  double VD[NC];               // per-component trapping (diffusive) speeds
   double Vscale, Escale, Tscale;   // reference speed, energy density, temperature (residual/unknown scaling)
   double newton_tol; int newton_max;
 } McParams;
@@ -339,6 +347,9 @@ static int mc_setup (McParams * P)
     fprintf (stderr, "mc_setup: cannot diagonalise D (need real positive eigenvalues; for NC >= 3 use modes_from_onsager)\n");
     return 1;
   }
+  if (P->trapping)
+    for (int i = 0; i < NC; i++)
+      if (P->VD[i] <= 0.) { fprintf (stderr, "mc_setup: trapping needs VD[%d] > 0\n", i); return 1; }
   if (P->newton_tol <= 0.) P->newton_tol = 1e-10;
   if (P->newton_max <= 0) P->newton_max = 40;
   if (P->Vscale <= 0.) P->Vscale = 1.;
@@ -348,6 +359,25 @@ static int mc_setup (McParams * P)
   if (P->gam.eps != 0. || P->kin.eps != 0.) { fprintf (stderr, "mc_setup: anisotropy is implemented in 2D only\n"); return 1; }
 #endif
   return 0;
+}
+
+/** Interface partitioning. Local equilibrium: the tie line. With `trapping`, a continuous-growth-model law
+(Aziz & Kaplan 1988) interpolates, per component, between the equilibrium solid composition and complete
+trapping (c_s = c_l):  c_s = (c_s^eq + c_l V/V_D) / (1 + V/V_D), i.e. k(V) = (k_e + V/V_D)/(1 + V/V_D) with
+k_e = c_s^eq/c_l.  The driving force still uses the equilibrium tie line (the kinetic shift of the liquidus
+slope is NOT included): this is a model approximation, exact in the dilute-alloy limit only for the partition
+coefficient. V is the (signed) normal speed; only V > 0 trapping is physical, so V is clamped at 0. */
+static void mc_partition (const McParams * P, const double cl[NC], double T, double V,
+                          double cs[NC], double * dOmega)
+{
+  mc_tie (&P->S, &P->L, cl, T, cs, dOmega);
+  if (P->trapping) {
+    double v = V > 0. ? V : 0.;
+    for (int i = 0; i < NC; i++) {
+      double r = v/P->VD[i];
+      cs[i] = (cs[i] + cl[i]*r)/(1. + r);
+    }
+  }
 }
 
 /* ------------------------------------------------------------------------------------------------
@@ -384,7 +414,7 @@ static void mc_residual (const McParams * P, const McLocalIn * in, const double 
   double V = u[NC];
   double T = P->evolveT ? u[NC + 1] : in->Tfrozen;
   double cs[NC], dO;
-  mc_tie (&P->S, &P->L, cl, T, cs, &dO);
+  mc_partition (P, cl, T, V, cs, &dO);
   /* component gradients along n_e for both phases */
   double wl[NC], ws[NC], gwl[NC], gws[NC], gcl[NC], gcs[NC];
   for (int k = 0; k < NC; k++) {
@@ -461,6 +491,6 @@ static void mc_local_solve (const McParams * P, const McLocalIn * in, McLocalOut
   for (int i = 0; i < NC; i++) out->cl[i] = u[i];
   out->V = u[NC];
   out->T = P->evolveT ? u[NC + 1] : in->Tfrozen;
-  mc_tie (&P->S, &P->L, out->cl, out->T, out->cs, &out->dOmega);
+  mc_partition (P, out->cl, out->T, out->V, out->cs, &out->dOmega);
   out->res = nr; out->iters = it; out->ok = (nr <= P->newton_tol*10.) && isfinite (nr);
 }

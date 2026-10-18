@@ -1,0 +1,9 @@
+--- a/alimare/LS_curvature.h
++++ b/alimare/LS_curvature.h
+@@ -104,6 +104,6 @@
+       curve_LS[] = nodata;
+     }
+   }
+-  curve_LS.dirty = true; // fixme: this goes with the hack above
++  // curve_LS.dirty = true; // removed: ghost-cell state is tracked automatically in current Basilisk
+   boundary({curve_LS});
