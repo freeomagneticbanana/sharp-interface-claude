@@ -43,3 +43,15 @@ class InterfaceMap:
     def project(self, vals):
         """vals: (K,) crossing data -> (nx, ny) grid field (value at the closest interface point)."""
         return np.sum(self.w * vals[self.ix], axis=-1)
+
+
+def bilinear(field, grid, x, y):
+    """Bilinear interpolation of a node field at points (x, y) (clamped to the grid)."""
+    fx = np.clip((x - grid.x0) / grid.dx, 0, grid.nx - 1 - 1e-9)
+    fy = np.clip((y - grid.y0) / grid.dx, 0, grid.ny - 1 - 1e-9) if grid.ny > 1 else np.zeros_like(y)
+    i, j = np.floor(fx).astype(int), np.floor(fy).astype(int)
+    tx, ty = fx - i, fy - j
+    i1 = np.minimum(i + 1, grid.nx - 1)
+    j1 = np.minimum(j + 1, grid.ny - 1)
+    return ((1 - tx) * (1 - ty) * field[i, j] + tx * (1 - ty) * field[i1, j]
+            + (1 - tx) * ty * field[i, j1] + tx * ty * field[i1, j1])
